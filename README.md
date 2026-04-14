@@ -13,6 +13,7 @@
 - 🔧 **易于扩展** - 新增平台只需3步，支持热配置更新
 - 📱 **现代化UI** - 响应式设计，支持移动端
 - 🔐 **多认证方式** - 支持Cookie和OAuth Token两种认证方式（UC网盘）
+- 🤖 **原生 TG 接入** - Telegram Bot 直接复用平台工厂，无需外挂 Python 机器人
 
 ## 🚀 快速开始
 
@@ -28,6 +29,9 @@ cd cookie-butler
 
 # 2. 安装依赖
 npm install
+
+# 额外：如需启用 Telegram Bot，复制环境变量模板
+cp .env.example .env
 
 # 3. 启动开发服务器
 npm run dev
@@ -75,9 +79,28 @@ docker run -d \
 # 其他可选配置
 # API_TIMEOUT=15000
 # SESSION_TTL=300000
+
+# Telegram Bot
+# TELEGRAM_BOT_TOKEN=123456:ABCDEF_your_bot_token
+# TELEGRAM_BOT_ALLOWED_CHAT_IDS=123456789,987654321
+# TELEGRAM_BOT_UPDATE_TIMEOUT=25
+# TELEGRAM_BOT_STATUS_INTERVAL=3000
+# TELEGRAM_BOT_QR_TIMEOUT=300000
 ```
 
 **💡 提示**：应用会自动处理CORS配置，通常不需要手动设置环境变量。
+
+### Telegram Bot 使用
+
+1. 在 `@BotFather` 创建机器人并拿到 `TELEGRAM_BOT_TOKEN`
+2. 复制 `.env.example` 为 `.env`，填入 `TELEGRAM_BOT_TOKEN`
+3. 可选配置 `TELEGRAM_BOT_ALLOWED_CHAT_IDS`，限制可访问的私聊 `chat_id`
+4. 启动服务后，在 Telegram 私聊机器人发送 `/start` 或 `/ck`
+
+**行为说明**：
+- 机器人默认使用长轮询，不需要额外 Webhook
+- 机器人只允许私聊使用，避免群聊泄露 Cookie 或 Token
+- TG 端直接复用项目内部平台逻辑，不走 `/api/qrcode` 和 `/api/check-status` 二次中转
 
 #### Docker 部署选项
 
@@ -155,6 +178,8 @@ cookie-butler/
 ├── docker-compose.yml        # Docker编排配置
 ├── .dockerignore             # Docker构建忽略文件
 ├── .env.example              # 环境变量配置示例
+├── telegram/                 # Telegram机器人模块
+│   └── bot.js                # TG轮询、按钮交互、二维码状态管理
 ├── api/                      # 后端API
 │   ├── qrcode.js            # 二维码生成路由
 │   ├── check-status.js      # 状态检查路由
@@ -192,6 +217,7 @@ cookie-butler/
 - **业务层** - 平台类专注核心业务逻辑
 - **配置层** - JSON文件管理所有可变参数
 - **工具层** - 基类提供通用功能
+- **渠道层** - Web 页面和 Telegram Bot 共享同一套平台工厂与状态机
 
 ## 🔧 扩展指南
 

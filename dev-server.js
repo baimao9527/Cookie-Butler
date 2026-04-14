@@ -1,14 +1,53 @@
 import express from 'express';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { readFileSync } from 'fs';
+import { existsSync, readFileSync } from 'fs';
+import { createTelegramBotService } from './telegram/bot.js';
 
 // ES模块中获取__dirname
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
+function loadEnvFile() {
+    const envPath = path.join(__dirname, '.env');
+    if (!existsSync(envPath)) {
+        return;
+    }
+
+    const envContent = readFileSync(envPath, 'utf-8');
+    for (const rawLine of envContent.split(/\r?\n/)) {
+        const line = rawLine.trim();
+        if (!line || line.startsWith('#')) {
+            continue;
+        }
+
+        const separatorIndex = line.indexOf('=');
+        if (separatorIndex === -1) {
+            continue;
+        }
+
+        const key = line.slice(0, separatorIndex).trim();
+        let value = line.slice(separatorIndex + 1).trim();
+
+        if (
+            (value.startsWith('"') && value.endsWith('"')) ||
+            (value.startsWith("'") && value.endsWith("'"))
+        ) {
+            value = value.slice(1, -1);
+        }
+
+        if (key && process.env[key] === undefined) {
+            process.env[key] = value;
+        }
+    }
+}
+
+loadEnvFile();
+
 const app = express();
 const PORT = process.env.PORT || 3000;
+const telegramBotService = createTelegramBotService();
+let isShuttingDown = false;
 
 // 中间件配置
 app.use(express.json());
@@ -109,7 +148,7 @@ app.use((error, req, res, next) => {
 });
 
 // 启动服务器
-app.listen(PORT, () => {
+const server = app.listen(PORT, async () => {
     console.log(`🚀 Cookie Butler 开发服务器启动成功！`);
     console.log(`📱 访问地址: http://localhost:${PORT}`);
     console.log(`🔧 环境: ${process.env.NODE_ENV || 'development'}`);
@@ -119,15 +158,51 @@ app.listen(PORT, () => {
     console.log('  - 修改代码后需要重启服务器');
     console.log('  - 推荐使用 "vercel dev" 获得热重载和完整功能');
     console.log('  - 按 Ctrl+C 停止服务器');
+
+    if (telegramBotService.isEnabled()) {
+        try {
+            await telegramBotService.start();
+        } catch (error) {
+            console.error('[Telegram] 启动失败:', error.message);
+        }
+    } else {
+        console.log('[Telegram] 未配置 TELEGRAM_BOT_TOKEN，跳过机器人启动');
+    }
 });
 
-// 优雅关闭
+async function shutdown(signal) {
+    if (isShuttingDown) {
+        return;
+    }
+
+    isShuttingDown = true;
+    console.log(`\n🛑 收到 ${signal}，正在关闭服务...`);
+
+    try {
+        await telegramBotService.stop();
+    } catch (error) {
+        console.error('[Telegram] 停止失败:', error.message);
+    }
+
+    server.close((error) => {
+        if (error) {
+            console.error('服务器关闭失败:', error);
+            process.exit(1);
+        }
+
+        process.exit(0);
+    });
+
+    setTimeout(() => {
+        console.error('服务器关闭超时，强制退出');
+        process.exit(1);
+    }, 5000).unref();
+}
+
 process.on('SIGINT', () => {
-    console.log('\n🛑 正在关闭服务器...');
-    process.exit(0);
+    shutdown('SIGINT');
 });
 
 process.on('SIGTERM', () => {
-    console.log('\n🛑 收到终止信号，正在关闭服务器...');
-    process.exit(0);
+    shutdown('SIGTERM');
 });
