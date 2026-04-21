@@ -2,20 +2,30 @@ import axios from 'axios';
 import { readFileSync } from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { platformFactory } from '../api/platforms/index.js';
-import { STATUS } from '../api/utils/common.js';
+import { Agent as HttpAgent } from 'node:http';
+import { Agent as HttpsAgent } from 'node:https';
+import { platformFactory } from '../lib/platforms/index.js';
+import { STATUS } from '../lib/utils/common.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const projectRoot = path.resolve(__dirname, '..');
 const platformConfig = JSON.parse(
-    readFileSync(path.resolve(projectRoot, 'api/config/platforms.json'), 'utf-8')
+    readFileSync(path.resolve(projectRoot, 'config/platforms.json'), 'utf-8')
 );
 
 const TELEGRAM_API_ROOT = 'https://api.telegram.org';
 const DEFAULT_UPDATE_TIMEOUT = 25;
 const DEFAULT_STATUS_INTERVAL = 3000;
 const DEFAULT_QR_TIMEOUT = platformConfig.common?.sessionTTL || 300000;
+const TELEGRAM_REQUEST_TIMEOUT = 30000;
+const TELEGRAM_TRANSPORT_CONFIG = {
+    // Node 19+ 默认会通过 https.globalAgent 复用 keep-alive 连接。
+    // Telegram 长轮询在 Docker 下持续运行时，复用 TLS socket 容易堆出监听器警告。
+    httpAgent: new HttpAgent({ keepAlive: false }),
+    httpsAgent: new HttpsAgent({ keepAlive: false }),
+    maxRedirects: 0
+};
 const PLATFORM_KEYS = [
     'quark',
     'uc',
@@ -646,12 +656,15 @@ class TelegramBotService {
     }
 
     async callTelegram(method, payload, extraConfig = {}) {
+        const { headers = {}, ...requestConfig } = extraConfig;
         const response = await axios.post(`${this.baseUrl}/${method}`, payload, {
+            ...TELEGRAM_TRANSPORT_CONFIG,
+            ...requestConfig,
             headers: {
-                'Content-Type': 'application/json'
+                'Content-Type': 'application/json',
+                ...headers
             },
-            timeout: 30000,
-            ...extraConfig
+            timeout: TELEGRAM_REQUEST_TIMEOUT
         });
 
         if (!response.data?.ok) {
@@ -664,12 +677,13 @@ class TelegramBotService {
     async callTelegramMultipart(method, fields, files) {
         const { body, boundary } = buildMultipartBody(fields, files);
         const response = await axios.post(`${this.baseUrl}/${method}`, body, {
+            ...TELEGRAM_TRANSPORT_CONFIG,
             headers: {
                 'Content-Type': `multipart/form-data; boundary=${boundary}`
             },
             maxBodyLength: Infinity,
             maxContentLength: Infinity,
-            timeout: 30000
+            timeout: TELEGRAM_REQUEST_TIMEOUT
         });
 
         if (!response.data?.ok) {

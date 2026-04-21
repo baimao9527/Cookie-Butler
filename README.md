@@ -180,25 +180,26 @@ cookie-butler/
 ├── .env.example              # 环境变量配置示例
 ├── telegram/                 # Telegram机器人模块
 │   └── bot.js                # TG轮询、按钮交互、二维码状态管理
-├── api/                      # 后端API
-│   ├── qrcode.js            # 二维码生成路由
-│   ├── check-status.js      # 状态检查路由
-│   ├── config/              # 配置文件
-│   │   └── platforms.json   # 平台配置
-│   ├── platforms/           # 平台实现
-│   │   ├── base.js         # 基础平台类
-│   │   ├── index.js        # 平台工厂
-│   │   ├── 115.js          # 115网盘实现
-│   │   ├── ali.js          # 阿里云盘实现
-│   │   ├── baidu.js        # 百度网盘实现
-│   │   ├── bilibili.js     # 哔哩哔哩实现
-│   │   ├── quark.js        # 夸克网盘实现
-│   │   ├── uc.js           # UC网盘Cookie版实现
-│   │   └── uc-token.js     # UC网盘Token版实现（OAuth）
+├── api/                      # Vercel API 路由入口
+│   ├── qrcode.js             # 二维码生成路由
+│   └── check-status.js       # 状态检查路由
+├── lib/                      # 平台实现与通用工具
+│   ├── platforms/            # 平台实现与平台工厂
+│   │   ├── base.js           # 基础平台类
+│   │   ├── index.js          # 平台工厂
+│   │   ├── 115.js            # 115网盘实现
+│   │   ├── ali.js            # 阿里云盘实现
+│   │   ├── baidu.js          # 百度网盘实现
+│   │   ├── bilibili.js       # 哔哩哔哩实现
+│   │   ├── guangyapan.js     # 光鸭云盘实现
+│   │   ├── quark.js          # 夸克网盘实现
+│   │   ├── uc.js             # UC网盘Cookie版实现
+│   │   └── uc-token.js       # UC网盘Token版实现（OAuth）
 │   └── utils/
-│       └── common.js        # 通用工具、安全函数和加密工具
-
-└── public/                  # 前端文件
+│       └── common.js         # 通用工具、安全函数和加密工具
+├── config/                   # 平台配置
+│   └── platforms.json        # 平台配置
+└── public/                   # 前端文件
     ├── index.html           # 主页面
     ├── script.js            # 交互逻辑
     ├── style.css            # 样式文件
@@ -226,7 +227,7 @@ cookie-butler/
 
 1. **创建平台类**
 ```javascript
-// api/platforms/newplatform.js
+// lib/platforms/newplatform.js
 import { BasePlatform } from './base.js';
 
 export class NewPlatform extends BasePlatform {
@@ -246,7 +247,7 @@ export class NewPlatform extends BasePlatform {
 
 2. **添加配置**
 ```json
-// api/config/platforms.json
+// config/platforms.json
 {
   "platforms": {
     "newplatform": {
@@ -261,7 +262,7 @@ export class NewPlatform extends BasePlatform {
 
 3. **注册到工厂**
 ```javascript
-// api/platforms/index.js
+// lib/platforms/index.js
 import { NewPlatform } from './newplatform.js';
 
 this.platforms = {
@@ -271,7 +272,7 @@ this.platforms = {
 ```
 
 ### 配置热更新
-修改 `api/config/platforms.json` 中的配置，重启服务即可生效。支持：
+修改 `config/platforms.json` 中的配置，重启服务即可生效。支持：
 - API端点URL更新
 - 请求参数调整
 - User-Agent更换

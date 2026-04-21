@@ -1,5 +1,5 @@
-import { platformFactory } from './platforms/index.js';
-import { createErrorResponse, setSafeCorsHeaders } from './utils/common.js';
+import { platformFactory } from '../lib/platforms/index.js';
+import { createErrorResponse, setSafeCorsHeaders } from '../lib/utils/common.js';
 
 export default async function handler(req, res) {
     // 设置安全的CORS头部
